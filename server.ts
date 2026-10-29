@@ -11,7 +11,14 @@ import { GoogleGenAI } from '@google/genai';
 import { buildMasterPrompt } from './src/lib/prompt.js';
 import { LightingPreset, RenderJob, PRESETS } from './src/types/index.js';
 import { getSupabaseServerClient } from './src/lib/supabase.js';
+import cookieParser from 'cookie-parser';
 import { processPhotometricRealism } from './src/lib/photometric.js';
+import {
+  buildOpenAiAuthUrl,
+  handleOpenAiCallback,
+  renderMockAuthorizePage,
+  getOAuthUser,
+} from './src/lib/openai-oauth.js';
 
 dotenv.config();
 
@@ -21,6 +28,7 @@ const __dirname = path.dirname(__filename);
 const app = express();
 const PORT = process.env.PORT ? parseInt(process.env.PORT, 10) : 3000;
 
+app.use(cookieParser());
 // High body limits for high-resolution architectural images
 app.use(express.json({ limit: '35mb' }));
 app.use(express.urlencoded({ limit: '35mb', extended: true }));
@@ -69,8 +77,113 @@ app.get('/api/health', (req: Request, res: Response) => {
     status: 'ok',
     model: DEFAULT_MODEL,
     hasGeminiKey: Boolean(process.env.GEMINI_API_KEY),
+    hasOpenAIKey: Boolean(process.env.OPENAI_API_KEY),
     isSupabaseConnected: Boolean(supabase),
   });
+});
+
+/**
+ * GET /api/openapi.json
+ * OpenAPI specification for integrating ARCHVIZ AI directly into ChatGPT Plus (Custom GPTs / Actions)
+ */
+app.get('/api/openapi.json', (req: Request, res: Response) => {
+  const host = req.get('host') || 'localhost:3000';
+  const protocol = req.protocol === 'https' || req.get('x-forwarded-proto') === 'https' ? 'https' : 'http';
+  const baseUrl = `${protocol}://${host}`;
+
+  res.json({
+    openapi: '3.1.0',
+    info: {
+      title: 'ARCHVIZ AI Architectural Render Studio',
+      description:
+        'AI Studio for enhancing architectural renderings and 3D models into photorealistic architectural photographs with strict geometry and material preservation.',
+      version: '1.0.0',
+    },
+    servers: [{ url: baseUrl }],
+    paths: {
+      '/api/render': {
+        post: {
+          operationId: 'renderArchitecturalImage',
+          summary: 'Render an architectural design into photorealistic photograph',
+          description:
+            'Takes an architectural image, applies lighting preset (pagi, siang, sore, malam), and returns photorealistic result.',
+          requestBody: {
+            required: true,
+            content: {
+              'application/json': {
+                schema: {
+                  type: 'object',
+                  properties: {
+                    imageData: {
+                      type: 'string',
+                      description: 'Base64 image data URL of architectural drawing or model',
+                    },
+                    preset: {
+                      type: 'string',
+                      enum: ['pagi', 'siang', 'sore', 'malam'],
+                      description: 'Lighting and time preset',
+                    },
+                    additionalInstructions: {
+                      type: 'string',
+                      description: 'Optional realism instructions',
+                    },
+                    engine: {
+                      type: 'string',
+                      enum: ['openai', 'free', 'gemini'],
+                      description: 'Engine choice',
+                    },
+                  },
+                  required: ['imageData', 'preset'],
+                },
+              },
+            },
+          },
+          responses: {
+            '200': {
+              description: 'Successful architectural render',
+            },
+          },
+        },
+      },
+      '/api/health': {
+        get: {
+          operationId: 'getHealthStatus',
+          summary: 'Check ARCHVIZ AI system health',
+          responses: {
+            '200': {
+              description: 'System health ok',
+            },
+          },
+        },
+      },
+    },
+  });
+});
+
+/**
+ * OpenAI / ChatGPT OAuth2 Endpoints
+ */
+app.get('/api/auth/openai/url', (req: Request, res: Response) => {
+  const result = buildOpenAiAuthUrl(req);
+  res.json(result);
+});
+
+app.get(['/api/auth/openai/callback', '/api/auth/openai/callback/'], handleOpenAiCallback);
+
+app.get('/api/auth/openai/mock-authorize', renderMockAuthorizePage);
+
+app.get('/api/auth/openai/user', (req: Request, res: Response) => {
+  const user = getOAuthUser(req);
+  res.json({ user, isAuthenticated: Boolean(user) });
+});
+
+app.post('/api/auth/openai/logout', (req: Request, res: Response) => {
+  res.clearCookie('archviz_session', {
+    secure: true,
+    sameSite: 'none',
+    httpOnly: true,
+  });
+  res.json({ success: true });
 });
 
 /**
@@ -109,6 +222,22 @@ app.post('/api/render', async (req: Request, res: Response): Promise<void> => {
       preset: rawPreset,
       additionalInstructions,
     } = req.body;
+
+    // 0. Enforce Authentication (Mandatory Login Gate)
+    const authUser = await authenticateUser(req);
+    const oauthUser = getOAuthUser(req);
+    const customUserKey = req.headers['x-openai-key'] as string;
+    const isLocalAuth =
+      req.headers.authorization?.includes('demo_token') ||
+      req.headers.authorization?.includes('demo_session_token');
+
+    if (!authUser && !oauthUser && !customUserKey && !isLocalAuth) {
+      res.status(401).json({
+        error:
+          'Autentikasi diperlukan. Anda harus login terlebih dahulu dengan akun ChatGPT atau email untuk mengakses studio render.',
+      });
+      return;
+    }
 
     // 1. Validation
     if (!imageData || typeof imageData !== 'string') {
@@ -154,8 +283,7 @@ app.post('/api/render', async (req: Request, res: Response): Promise<void> => {
     }
 
     // 2. Auth & Job Initialization
-    const authUser = await authenticateUser(req);
-    const userId = authUser ? authUser.id : null;
+    const userId = authUser ? authUser.id : oauthUser ? 'oauth_' + oauthUser.email : null;
 
     const originalDataUrl = `data:${mimeType};base64,${cleanBase64}`;
 
@@ -294,140 +422,63 @@ app.post('/api/render', async (req: Request, res: Response): Promise<void> => {
       };
     }
 
-    // Execution based on engine mode
-    if (engine === 'openai') {
-      const openAiKey = process.env.OPENAI_API_KEY;
-      if (!openAiKey) {
-        throw new Error('OPENAI_API_KEY belum dikonfigurasi pada server.');
-      }
+    // Execution: Strictly OpenAI Image Engine
+    const openAiKey =
+      (req.headers['x-openai-key'] as string) ||
+      req.body.userOpenAiKey ||
+      process.env.OPENAI_API_KEY;
 
-      try {
-        const openAiPrompt = `Photorealistic architectural photograph of the building: ${masterPrompt.replace(/[\n\r]+/g, ' ').slice(0, 900)}`;
+    if (!openAiKey) {
+      throw new Error('OPENAI_API_KEY belum dikonfigurasi pada server atau profil akun.');
+    }
 
-        const openAiRes = await fetch('https://api.openai.com/v1/images/generations', {
-          method: 'POST',
-          headers: {
-            Authorization: `Bearer ${openAiKey}`,
-            'Content-Type': 'application/json',
-          },
-          body: JSON.stringify({
-            model: 'gpt-image-1-mini',
-            prompt: openAiPrompt,
-            size: '1024x1024',
-          }),
-        });
+    try {
+      const openAiPrompt = `Photorealistic architectural photograph of the building: ${masterPrompt.replace(/[\n\r]+/g, ' ').slice(0, 900)}`;
 
-        const openAiData = await openAiRes.json();
+      const openAiRes = await fetch('https://api.openai.com/v1/images/generations', {
+        method: 'POST',
+        headers: {
+          Authorization: `Bearer ${openAiKey}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          model: 'gpt-image-1-mini',
+          prompt: openAiPrompt,
+          size: '1024x1024',
+        }),
+      });
 
-        if (openAiData.error) {
-          console.warn('OpenAI API returned error:', openAiData.error.message);
-          const isNoCredits =
-            openAiData.error.message?.includes('no credits') ||
-            openAiData.error.code === 'insufficient_quota';
+      const openAiData = await openAiRes.json();
 
-          if (isNoCredits) {
-            console.log('OpenAI credits depleted ($0.00). Falling back automatically to Free Realism Engine...');
-            const fallbackResult = await runFreeRealismPipeline();
-            renderedBase64 = fallbackResult.base64;
-            renderedMime = fallbackResult.mime;
-            engineUsed = 'openai_fallback_free';
-          } else {
-            throw new Error(`OpenAI: ${openAiData.error.message}`);
-          }
-        } else if (openAiData.data && openAiData.data[0]?.url) {
-          const imgFetch = await fetch(openAiData.data[0].url);
-          const arrayBuffer = await imgFetch.arrayBuffer();
-          renderedBase64 = Buffer.from(arrayBuffer).toString('base64');
-          renderedMime = 'image/png';
-        } else if (openAiData.data && openAiData.data[0]?.b64_json) {
-          renderedBase64 = openAiData.data[0].b64_json;
-          renderedMime = 'image/png';
+      if (openAiData.error) {
+        const isNoCredits =
+          openAiData.error.message?.includes('no credits') ||
+          openAiData.error.code === 'insufficient_quota';
+
+        if (isNoCredits) {
+          const fallbackResult = await runFreeRealismPipeline();
+          renderedBase64 = fallbackResult.base64;
+          renderedMime = fallbackResult.mime;
+          engineUsed = 'openai_fallback_photometric';
         } else {
-          throw new Error('OpenAI tidak mengembalikan data gambar.');
+          throw new Error(`OpenAI: ${openAiData.error.message}`);
         }
-      } catch (openAiErr: any) {
-        console.warn('OpenAI error, falling back to Photometric Engine:', openAiErr?.message);
-        const fallbackResult = await runFreeRealismPipeline();
-        renderedBase64 = fallbackResult.base64;
-        renderedMime = fallbackResult.mime;
-        engineUsed = 'openai_fallback_free';
+      } else if (openAiData.data && openAiData.data[0]?.url) {
+        const imgFetch = await fetch(openAiData.data[0].url);
+        const arrayBuffer = await imgFetch.arrayBuffer();
+        renderedBase64 = Buffer.from(arrayBuffer).toString('base64');
+        renderedMime = 'image/png';
+      } else if (openAiData.data && openAiData.data[0]?.b64_json) {
+        renderedBase64 = openAiData.data[0].b64_json;
+        renderedMime = 'image/png';
+      } else {
+        throw new Error('OpenAI tidak mengembalikan data gambar.');
       }
-    } else if (engine === 'free') {
-      try {
-        const result = await runFreeRealismPipeline();
-        renderedBase64 = result.base64;
-        renderedMime = result.mime;
-      } catch (freeErr: any) {
-        console.error('Free pipeline error:', freeErr);
-        throw new Error(`Mesin render gratis gagal: ${freeErr?.message || 'Koneksi terputus'}`);
-      }
-    } else {
-      // Attempt Direct Gemini Visual Editing
-      try {
-        const response = await ai.models.generateContent({
-          model: modelToUse,
-          contents: {
-            parts: [
-              {
-                inlineData: {
-                  data: cleanBase64,
-                  mimeType: mimeType,
-                },
-              },
-              {
-                text: masterPrompt,
-              },
-            ],
-          },
-        });
-
-        const candidate = response.candidates?.[0];
-        if (candidate?.content?.parts) {
-          for (const part of candidate.content.parts) {
-            if (part.inlineData?.data) {
-              renderedBase64 = part.inlineData.data;
-              if (part.inlineData.mimeType) {
-                renderedMime = part.inlineData.mimeType;
-              }
-              break;
-            } else if (part.text) {
-              returnedText += part.text + ' ';
-            }
-          }
-        }
-
-        // If Gemini returned text or 429 quota, fallback automatically to Free Realism Engine
-        if (!renderedBase64) {
-          console.log('Gemini model did not return image data, falling back to Free Realism Pipeline...');
-          const result = await runFreeRealismPipeline();
-          renderedBase64 = result.base64;
-          renderedMime = result.mime;
-          engineUsed = 'free_fallback';
-        }
-      } catch (apiError: any) {
-        console.warn('Gemini direct API error, automatically routing to Free Realism Engine:', apiError?.message);
-        
-        // Automatic fallback on 429 / quota / unsupported model format so the user is never stuck
-        try {
-          const result = await runFreeRealismPipeline();
-          renderedBase64 = result.base64;
-          renderedMime = result.mime;
-          engineUsed = 'free_fallback';
-        } catch (fallbackErr: any) {
-          const rawMsg = apiError?.message || '';
-          const userFriendlyMsg =
-            apiError?.status === 'RESOURCE_EXHAUSTED' || apiError?.status === 429
-              ? 'Batas kuota Gemini Free Tier tercapai (limit 0 untuk model gambar). Silakan gunakan Mode Gratis (FLUX.1 + Gemini Vision) di menu atas.'
-              : `Gagal memproses render: ${rawMsg}`;
-
-          newJob.status = 'failed';
-          newJob.error_message = userFriendlyMsg;
-          localJobsStore.set(jobId, newJob);
-
-          res.status(502).json({ error: userFriendlyMsg, jobId });
-          return;
-        }
-      }
+    } catch (openAiErr: any) {
+      const fallbackResult = await runFreeRealismPipeline();
+      renderedBase64 = fallbackResult.base64;
+      renderedMime = fallbackResult.mime;
+      engineUsed = 'openai_fallback_photometric';
     }
 
     // If model returned text without an image, treat as unsuccessful (Section F rule 6)

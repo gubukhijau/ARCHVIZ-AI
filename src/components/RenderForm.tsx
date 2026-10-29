@@ -16,7 +16,6 @@ interface RenderFormProps {
   fileSize: number | null;
   selectedPreset: LightingPreset;
   additionalInstructions: string;
-  engine: 'openai' | 'free' | 'gemini';
   isRendering: boolean;
   renderingStage: string | null;
   errorMessage: string | null;
@@ -24,7 +23,6 @@ interface RenderFormProps {
   onImageCleared: () => void;
   onPresetSelect: (preset: LightingPreset) => void;
   onInstructionsChange: (val: string) => void;
-  onEngineChange: (engine: 'openai' | 'free' | 'gemini') => void;
   onSubmitRender: () => void;
 }
 
@@ -35,7 +33,6 @@ export const RenderForm: React.FC<RenderFormProps> = ({
   fileSize,
   selectedPreset,
   additionalInstructions,
-  engine,
   isRendering,
   renderingStage,
   errorMessage,
@@ -43,7 +40,6 @@ export const RenderForm: React.FC<RenderFormProps> = ({
   onImageCleared,
   onPresetSelect,
   onInstructionsChange,
-  onEngineChange,
   onSubmitRender,
 }) => {
   const canRender = Boolean(imagePreview && !isRendering);
@@ -57,111 +53,15 @@ export const RenderForm: React.FC<RenderFormProps> = ({
 
   return (
     <form onSubmit={handleSubmit} className="space-y-6">
-      {/* Engine Mode Selection */}
-      <div className="space-y-1.5">
-        <div className="flex items-baseline justify-between">
-          <label className="text-xs font-semibold uppercase tracking-wider text-neutral-700">
-            Pilihan Image Generator AI
-          </label>
-          <span className="text-[11px] text-neutral-500">Pilih mesin render</span>
+      {/* OpenAI ChatGPT Architectural Engine Badge */}
+      <div className="flex items-center justify-between p-3 rounded-xl bg-neutral-50 border border-neutral-200 text-xs">
+        <div className="flex items-center gap-2">
+          <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
+          <span className="font-semibold text-neutral-900">Mesin Render: OpenAI ChatGPT Architectural Engine</span>
         </div>
-        <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5">
-          <button
-            type="button"
-            disabled={isRendering}
-            onClick={() => onEngineChange('openai')}
-            className={`p-3 rounded-xl border text-left transition-all cursor-pointer ${
-              engine === 'openai'
-                ? 'border-neutral-900 bg-neutral-950 text-white shadow-xs ring-1 ring-neutral-900'
-                : 'border-neutral-200 bg-white hover:bg-neutral-50 text-neutral-900'
-            }`}
-          >
-            <div className="flex items-center justify-between mb-1">
-              <span className="font-semibold text-xs flex items-center gap-1.5">
-                <span className="w-2 h-2 rounded-full bg-emerald-400" />
-                OpenAI (Aktif)
-              </span>
-              <span
-                className={`text-[10px] px-1.5 py-0.5 rounded ${
-                  engine === 'openai' ? 'bg-neutral-800 text-neutral-300' : 'bg-neutral-100 text-neutral-600'
-                }`}
-              >
-                API Key Anda
-              </span>
-            </div>
-            <p
-              className={`text-[11px] leading-relaxed ${
-                engine === 'openai' ? 'text-neutral-300' : 'text-neutral-500'
-              }`}
-            >
-              Model gpt-image OpenAI dengan API key Anda. Dilengkapi proteksi auto-fallback.
-            </p>
-          </button>
-
-          <button
-            type="button"
-            disabled={isRendering}
-            onClick={() => onEngineChange('free')}
-            className={`p-3 rounded-xl border text-left transition-all cursor-pointer ${
-              engine === 'free'
-                ? 'border-neutral-900 bg-neutral-950 text-white shadow-xs ring-1 ring-neutral-900'
-                : 'border-neutral-200 bg-white hover:bg-neutral-50 text-neutral-900'
-            }`}
-          >
-            <div className="flex items-center justify-between mb-1">
-              <span className="font-semibold text-xs flex items-center gap-1.5">
-                <span className="w-2 h-2 rounded-full bg-blue-400" />
-                Fotorealisme AI (Gratis)
-              </span>
-              <span
-                className={`text-[10px] px-1.5 py-0.5 rounded ${
-                  engine === 'free' ? 'bg-neutral-800 text-neutral-300' : 'bg-neutral-100 text-neutral-600'
-                }`}
-              >
-                Bebas Kuota
-              </span>
-            </div>
-            <p
-              className={`text-[11px] leading-relaxed ${
-                engine === 'free' ? 'text-neutral-300' : 'text-neutral-500'
-              }`}
-            >
-              Gemini Vision + Photometric Realism. 100% gratis tanpa biaya saldo.
-            </p>
-          </button>
-
-          <button
-            type="button"
-            disabled={isRendering}
-            onClick={() => onEngineChange('gemini')}
-            className={`p-3 rounded-xl border text-left transition-all cursor-pointer ${
-              engine === 'gemini'
-                ? 'border-neutral-900 bg-neutral-950 text-white shadow-xs ring-1 ring-neutral-900'
-                : 'border-neutral-200 bg-white hover:bg-neutral-50 text-neutral-900'
-            }`}
-          >
-            <div className="flex items-center justify-between mb-1">
-              <span className="font-semibold text-xs flex items-center gap-1.5">
-                <span className="w-2 h-2 rounded-full bg-amber-400" />
-                Gemini Direct
-              </span>
-              <span
-                className={`text-[10px] px-1.5 py-0.5 rounded ${
-                  engine === 'gemini' ? 'bg-neutral-800 text-neutral-300' : 'bg-neutral-100 text-neutral-600'
-                }`}
-              >
-                gemini-3.1
-              </span>
-            </div>
-            <p
-              className={`text-[11px] leading-relaxed ${
-                engine === 'gemini' ? 'text-neutral-300' : 'text-neutral-500'
-              }`}
-            >
-              Model visual diffusion Google. Memerlukan billing aktif Google AI Studio.
-            </p>
-          </button>
-        </div>
+        <span className="text-[11px] px-2 py-0.5 rounded bg-emerald-100 text-emerald-800 font-medium">
+          DALL-E / GPT-Image
+        </span>
       </div>
 
       {/* 1. Upload Section */}

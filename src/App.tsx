@@ -19,6 +19,7 @@ import { RenderForm } from './components/RenderForm.js';
 import { ResultView } from './components/ResultView.js';
 import { HistoryView } from './components/HistoryView.js';
 import { AuthModal } from './components/AuthModal.js';
+import { AuthGate } from './components/AuthGate.js';
 import { getSupabaseBrowserClient } from './lib/supabase.js';
 
 export default function App() {
@@ -32,7 +33,6 @@ export default function App() {
   const [fileSize, setFileSize] = useState<number | null>(null);
   const [selectedPreset, setSelectedPreset] = useState<LightingPreset>('siang');
   const [additionalInstructions, setAdditionalInstructions] = useState<string>('');
-  const [engine, setEngine] = useState<'openai' | 'free' | 'gemini'>('openai');
 
   // Processing & Job State
   const [isRendering, setIsRendering] = useState<boolean>(false);
@@ -154,6 +154,10 @@ export default function App() {
       if (authToken) {
         headers['Authorization'] = `Bearer ${authToken}`;
       }
+      const personalOpenAiKey = localStorage.getItem('user_openai_key');
+      if (personalOpenAiKey) {
+        headers['x-openai-key'] = personalOpenAiKey;
+      }
 
       const response = await fetch('/api/render', {
         method: 'POST',
@@ -163,7 +167,7 @@ export default function App() {
           mimeType: mimeType || 'image/png',
           preset: selectedPreset,
           additionalInstructions: additionalInstructions.trim() || undefined,
-          engine,
+          engine: 'openai',
         }),
       });
 
@@ -221,6 +225,36 @@ export default function App() {
       setRenderingStage(null);
     }
   };
+
+  const handleLogout = async () => {
+    const supabase = getSupabaseBrowserClient();
+    if (supabase) {
+      await supabase.auth.signOut();
+    }
+    try {
+      await fetch('/api/auth/openai/logout', { method: 'POST' });
+    } catch {
+      // ignore
+    }
+    setUser(null);
+    setAuthToken(null);
+    localStorage.removeItem('archviz_user');
+    localStorage.removeItem('openai_oauth_connected');
+    setCurrentView('studio');
+  };
+
+  // Mandatory Login Gate: Anyone wanting to access the application MUST log in first
+  if (!user) {
+    return (
+      <AuthGate
+        onAuthenticated={(newUser, token) => {
+          setUser(newUser);
+          setAuthToken(token || null);
+          fetchHistory();
+        }}
+      />
+    );
+  }
 
   return (
     <div className="min-h-screen bg-neutral-100/60 text-neutral-900 font-sans flex flex-col antialiased selection:bg-neutral-900 selection:text-white">
@@ -305,12 +339,22 @@ export default function App() {
             <button
               type="button"
               onClick={() => setIsAuthModalOpen(true)}
-              className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium text-neutral-700 hover:text-neutral-950 hover:bg-neutral-100 border border-neutral-200 bg-white transition-all"
+              className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium text-neutral-700 hover:text-neutral-950 hover:bg-neutral-100 border border-neutral-200 bg-white transition-all cursor-pointer"
             >
-              <User className="w-3.5 h-3.5" />
-              <span className="max-w-[100px] truncate hidden sm:inline">
-                {user ? user.email?.split('@')[0] : 'Akun'}
+              <User className="w-3.5 h-3.5 text-emerald-600" />
+              <span className="max-w-[120px] truncate hidden sm:inline">
+                {user?.email ? user.email.split('@')[0] : 'Akun'}
               </span>
+            </button>
+
+            {/* Logout Button */}
+            <button
+              type="button"
+              onClick={handleLogout}
+              className="px-2.5 py-1.5 rounded-lg text-xs font-medium text-neutral-500 hover:text-rose-600 hover:bg-rose-50 transition-colors cursor-pointer"
+              title="Keluar dari akun"
+            >
+              Keluar
             </button>
           </nav>
         </div>
@@ -347,7 +391,6 @@ export default function App() {
                 fileSize={fileSize}
                 selectedPreset={selectedPreset}
                 additionalInstructions={additionalInstructions}
-                engine={engine}
                 isRendering={isRendering}
                 renderingStage={renderingStage}
                 errorMessage={errorMessage}
@@ -355,7 +398,6 @@ export default function App() {
                 onImageCleared={handleImageCleared}
                 onPresetSelect={setSelectedPreset}
                 onInstructionsChange={setAdditionalInstructions}
-                onEngineChange={setEngine}
                 onSubmitRender={handleSubmitRender}
               />
             </div>
