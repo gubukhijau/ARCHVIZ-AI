@@ -18,6 +18,7 @@ import {
   handleOpenAiCallback,
   renderMockAuthorizePage,
   getOAuthUser,
+  handleDirectLogin,
 } from './src/lib/openai-oauth.js';
 
 dotenv.config();
@@ -176,6 +177,8 @@ app.get('/api/auth/openai/user', (req: Request, res: Response) => {
   const user = getOAuthUser(req);
   res.json({ user, isAuthenticated: Boolean(user) });
 });
+
+app.post('/api/auth/openai/direct-login', handleDirectLogin);
 
 app.post('/api/auth/openai/logout', (req: Request, res: Response) => {
   res.clearCookie('archviz_session', {
