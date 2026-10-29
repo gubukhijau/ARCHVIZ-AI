@@ -1,0 +1,6 @@
+{
+  "name": "ARCHVIZ AI",
+  "description": "Architectural Photo Realism Studio — enhance architectural renders while strictly preserving original design geometry and materials.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
