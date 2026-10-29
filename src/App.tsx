@@ -32,7 +32,7 @@ export default function App() {
   const [fileSize, setFileSize] = useState<number | null>(null);
   const [selectedPreset, setSelectedPreset] = useState<LightingPreset>('siang');
   const [additionalInstructions, setAdditionalInstructions] = useState<string>('');
-  const [engine, setEngine] = useState<'free' | 'gemini'>('free');
+  const [engine, setEngine] = useState<'openai' | 'free' | 'gemini'>('openai');
 
   // Processing & Job State
   const [isRendering, setIsRendering] = useState<boolean>(false);

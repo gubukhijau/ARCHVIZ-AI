@@ -295,7 +295,64 @@ app.post('/api/render', async (req: Request, res: Response): Promise<void> => {
     }
 
     // Execution based on engine mode
-    if (engine === 'free') {
+    if (engine === 'openai') {
+      const openAiKey = process.env.OPENAI_API_KEY;
+      if (!openAiKey) {
+        throw new Error('OPENAI_API_KEY belum dikonfigurasi pada server.');
+      }
+
+      try {
+        const openAiPrompt = `Photorealistic architectural photograph of the building: ${masterPrompt.replace(/[\n\r]+/g, ' ').slice(0, 900)}`;
+
+        const openAiRes = await fetch('https://api.openai.com/v1/images/generations', {
+          method: 'POST',
+          headers: {
+            Authorization: `Bearer ${openAiKey}`,
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            model: 'gpt-image-1-mini',
+            prompt: openAiPrompt,
+            size: '1024x1024',
+          }),
+        });
+
+        const openAiData = await openAiRes.json();
+
+        if (openAiData.error) {
+          console.warn('OpenAI API returned error:', openAiData.error.message);
+          const isNoCredits =
+            openAiData.error.message?.includes('no credits') ||
+            openAiData.error.code === 'insufficient_quota';
+
+          if (isNoCredits) {
+            console.log('OpenAI credits depleted ($0.00). Falling back automatically to Free Realism Engine...');
+            const fallbackResult = await runFreeRealismPipeline();
+            renderedBase64 = fallbackResult.base64;
+            renderedMime = fallbackResult.mime;
+            engineUsed = 'openai_fallback_free';
+          } else {
+            throw new Error(`OpenAI: ${openAiData.error.message}`);
+          }
+        } else if (openAiData.data && openAiData.data[0]?.url) {
+          const imgFetch = await fetch(openAiData.data[0].url);
+          const arrayBuffer = await imgFetch.arrayBuffer();
+          renderedBase64 = Buffer.from(arrayBuffer).toString('base64');
+          renderedMime = 'image/png';
+        } else if (openAiData.data && openAiData.data[0]?.b64_json) {
+          renderedBase64 = openAiData.data[0].b64_json;
+          renderedMime = 'image/png';
+        } else {
+          throw new Error('OpenAI tidak mengembalikan data gambar.');
+        }
+      } catch (openAiErr: any) {
+        console.warn('OpenAI error, falling back to Photometric Engine:', openAiErr?.message);
+        const fallbackResult = await runFreeRealismPipeline();
+        renderedBase64 = fallbackResult.base64;
+        renderedMime = fallbackResult.mime;
+        engineUsed = 'openai_fallback_free';
+      }
+    } else if (engine === 'free') {
       try {
         const result = await runFreeRealismPipeline();
         renderedBase64 = result.base64;

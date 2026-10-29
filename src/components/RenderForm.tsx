@@ -16,7 +16,7 @@ interface RenderFormProps {
   fileSize: number | null;
   selectedPreset: LightingPreset;
   additionalInstructions: string;
-  engine: 'free' | 'gemini';
+  engine: 'openai' | 'free' | 'gemini';
   isRendering: boolean;
   renderingStage: string | null;
   errorMessage: string | null;
@@ -24,7 +24,7 @@ interface RenderFormProps {
   onImageCleared: () => void;
   onPresetSelect: (preset: LightingPreset) => void;
   onInstructionsChange: (val: string) => void;
-  onEngineChange: (engine: 'free' | 'gemini') => void;
+  onEngineChange: (engine: 'openai' | 'free' | 'gemini') => void;
   onSubmitRender: () => void;
 }
 
@@ -61,11 +61,43 @@ export const RenderForm: React.FC<RenderFormProps> = ({
       <div className="space-y-1.5">
         <div className="flex items-baseline justify-between">
           <label className="text-xs font-semibold uppercase tracking-wider text-neutral-700">
-            Model Engine AI
+            Pilihan Image Generator AI
           </label>
           <span className="text-[11px] text-neutral-500">Pilih mesin render</span>
         </div>
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5">
+          <button
+            type="button"
+            disabled={isRendering}
+            onClick={() => onEngineChange('openai')}
+            className={`p-3 rounded-xl border text-left transition-all cursor-pointer ${
+              engine === 'openai'
+                ? 'border-neutral-900 bg-neutral-950 text-white shadow-xs ring-1 ring-neutral-900'
+                : 'border-neutral-200 bg-white hover:bg-neutral-50 text-neutral-900'
+            }`}
+          >
+            <div className="flex items-center justify-between mb-1">
+              <span className="font-semibold text-xs flex items-center gap-1.5">
+                <span className="w-2 h-2 rounded-full bg-emerald-400" />
+                OpenAI (Aktif)
+              </span>
+              <span
+                className={`text-[10px] px-1.5 py-0.5 rounded ${
+                  engine === 'openai' ? 'bg-neutral-800 text-neutral-300' : 'bg-neutral-100 text-neutral-600'
+                }`}
+              >
+                API Key Anda
+              </span>
+            </div>
+            <p
+              className={`text-[11px] leading-relaxed ${
+                engine === 'openai' ? 'text-neutral-300' : 'text-neutral-500'
+              }`}
+            >
+              Model gpt-image OpenAI dengan API key Anda. Dilengkapi proteksi auto-fallback.
+            </p>
+          </button>
+
           <button
             type="button"
             disabled={isRendering}
@@ -78,7 +110,7 @@ export const RenderForm: React.FC<RenderFormProps> = ({
           >
             <div className="flex items-center justify-between mb-1">
               <span className="font-semibold text-xs flex items-center gap-1.5">
-                <span className="w-2 h-2 rounded-full bg-emerald-400" />
+                <span className="w-2 h-2 rounded-full bg-blue-400" />
                 Fotorealisme AI (Gratis)
               </span>
               <span
@@ -86,7 +118,7 @@ export const RenderForm: React.FC<RenderFormProps> = ({
                   engine === 'free' ? 'bg-neutral-800 text-neutral-300' : 'bg-neutral-100 text-neutral-600'
                 }`}
               >
-                Hasil Maksimal
+                Bebas Kuota
               </span>
             </div>
             <p
@@ -94,7 +126,7 @@ export const RenderForm: React.FC<RenderFormProps> = ({
                 engine === 'free' ? 'text-neutral-300' : 'text-neutral-500'
               }`}
             >
-              Gemini 3.8 Vision + FLUX Arsitektur. Tanpa batas kuota, mempertahankan geometri asli.
+              Gemini Vision + Photometric Realism. 100% gratis tanpa biaya saldo.
             </p>
           </button>
 
@@ -111,14 +143,14 @@ export const RenderForm: React.FC<RenderFormProps> = ({
             <div className="flex items-center justify-between mb-1">
               <span className="font-semibold text-xs flex items-center gap-1.5">
                 <span className="w-2 h-2 rounded-full bg-amber-400" />
-                Gemini Direct (Paid Key)
+                Gemini Direct
               </span>
               <span
                 className={`text-[10px] px-1.5 py-0.5 rounded ${
                   engine === 'gemini' ? 'bg-neutral-800 text-neutral-300' : 'bg-neutral-100 text-neutral-600'
                 }`}
               >
-                gemini-3.1-image
+                gemini-3.1
               </span>
             </div>
             <p
@@ -126,7 +158,7 @@ export const RenderForm: React.FC<RenderFormProps> = ({
                 engine === 'gemini' ? 'text-neutral-300' : 'text-neutral-500'
               }`}
             >
-              Model visual editing Google. Memerlukan akun berbayar aktif di Google AI Studio.
+              Model visual diffusion Google. Memerlukan billing aktif Google AI Studio.
             </p>
           </button>
         </div>
