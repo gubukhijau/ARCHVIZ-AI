@@ -278,12 +278,6 @@ app.post('/api/render', async (req: Request, res: Response): Promise<void> => {
     }
 
     const preset = (rawPreset?.toLowerCase() || 'siang') as LightingPreset;
-    if (!PRESETS[preset]) {
-      res.status(400).json({
-        error: `Invalid lighting preset "${rawPreset}". Allowed: pagi, siang, sore, malam.`,
-      });
-      return;
-    }
 
     // 2. Auth & Job Initialization
     const userId = authUser ? authUser.id : oauthUser ? 'oauth_' + oauthUser.email : null;

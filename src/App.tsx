@@ -31,8 +31,6 @@ export default function App() {
   const [mimeType, setMimeType] = useState<string | null>(null);
   const [fileName, setFileName] = useState<string | null>(null);
   const [fileSize, setFileSize] = useState<number | null>(null);
-  const [selectedPreset, setSelectedPreset] = useState<LightingPreset>('siang');
-  const [additionalInstructions, setAdditionalInstructions] = useState<string>('');
 
   // Processing & Job State
   const [isRendering, setIsRendering] = useState<boolean>(false);
@@ -165,8 +163,6 @@ export default function App() {
         body: JSON.stringify({
           imageData: imagePreview,
           mimeType: mimeType || 'image/png',
-          preset: selectedPreset,
-          additionalInstructions: additionalInstructions.trim() || undefined,
           engine: 'openai',
         }),
       });
@@ -389,15 +385,11 @@ export default function App() {
                 mimeType={mimeType}
                 fileName={fileName}
                 fileSize={fileSize}
-                selectedPreset={selectedPreset}
-                additionalInstructions={additionalInstructions}
                 isRendering={isRendering}
                 renderingStage={renderingStage}
                 errorMessage={errorMessage}
                 onImageSelected={handleImageSelected}
                 onImageCleared={handleImageCleared}
-                onPresetSelect={setSelectedPreset}
-                onInstructionsChange={setAdditionalInstructions}
                 onSubmitRender={handleSubmitRender}
               />
             </div>

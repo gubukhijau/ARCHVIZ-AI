@@ -3,26 +3,21 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import React from 'react';
-import { Sparkles, Loader2, ShieldCheck, AlertCircle } from 'lucide-react';
-import { LightingPreset } from '../types/index.js';
+import React, { useState } from 'react';
+import { Sparkles, Loader2, ShieldCheck, AlertCircle, Lock, ChevronDown, ChevronUp, FileText } from 'lucide-react';
 import { ImageUploadZone } from './ImageUploadZone.js';
-import { LightingPresetSelector } from './LightingPresetSelector.js';
+import { MASTER_EXTREME_REALISM_PROMPT } from '../lib/prompt.js';
 
 interface RenderFormProps {
   imagePreview: string | null;
   mimeType: string | null;
   fileName: string | null;
   fileSize: number | null;
-  selectedPreset: LightingPreset;
-  additionalInstructions: string;
   isRendering: boolean;
   renderingStage: string | null;
   errorMessage: string | null;
   onImageSelected: (base64: string, mime: string, name: string, size: number) => void;
   onImageCleared: () => void;
-  onPresetSelect: (preset: LightingPreset) => void;
-  onInstructionsChange: (val: string) => void;
   onSubmitRender: () => void;
 }
 
@@ -31,17 +26,14 @@ export const RenderForm: React.FC<RenderFormProps> = ({
   mimeType,
   fileName,
   fileSize,
-  selectedPreset,
-  additionalInstructions,
   isRendering,
   renderingStage,
   errorMessage,
   onImageSelected,
   onImageCleared,
-  onPresetSelect,
-  onInstructionsChange,
   onSubmitRender,
 }) => {
+  const [showPromptDetails, setShowPromptDetails] = useState(false);
   const canRender = Boolean(imagePreview && !isRendering);
 
   const handleSubmit = (e: React.FormEvent) => {
@@ -53,15 +45,45 @@ export const RenderForm: React.FC<RenderFormProps> = ({
 
   return (
     <form onSubmit={handleSubmit} className="space-y-6">
-      {/* OpenAI ChatGPT Architectural Engine Badge */}
-      <div className="flex items-center justify-between p-3 rounded-xl bg-neutral-50 border border-neutral-200 text-xs">
-        <div className="flex items-center gap-2">
-          <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
-          <span className="font-semibold text-neutral-900">Mesin Render: OpenAI ChatGPT Architectural Engine</span>
+      {/* Extreme Photorealism & Design Lock Active Badge */}
+      <div className="rounded-xl bg-neutral-900 border border-neutral-800 text-white p-4 shadow-xs space-y-2.5">
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-2">
+            <div className="flex items-center justify-center w-6 h-6 rounded-lg bg-emerald-500/20 text-emerald-400">
+              <Lock className="w-3.5 h-3.5" />
+            </div>
+            <div>
+              <span className="font-semibold text-xs tracking-wide uppercase text-neutral-100">
+                Extreme Photorealism | Absolute Design &amp; Element Lock
+              </span>
+              <p className="text-[11px] text-neutral-400">
+                100% Geometri, dimensi, fasad, material, dan sudut kamera dikunci total. Hanya realisme visual yang ditingkatkan.
+              </p>
+            </div>
+          </div>
+          <span className="text-[10px] px-2 py-0.5 rounded-full bg-emerald-500/20 text-emerald-300 border border-emerald-500/30 font-medium shrink-0">
+            Prompt Otomatis Aktif
+          </span>
         </div>
-        <span className="text-[11px] px-2 py-0.5 rounded bg-emerald-100 text-emerald-800 font-medium">
-          DALL-E / GPT-Image
-        </span>
+
+        {/* Accordion to view the exact active prompt */}
+        <div className="pt-1 border-t border-neutral-800/80">
+          <button
+            type="button"
+            onClick={() => setShowPromptDetails(!showPromptDetails)}
+            className="flex items-center gap-1.5 text-[11px] text-neutral-400 hover:text-neutral-200 transition-colors cursor-pointer"
+          >
+            <FileText className="w-3.5 h-3.5 text-neutral-500" />
+            <span>Lihat Prompt Master Ekstrem Fotorealisme yang digunakan</span>
+            {showPromptDetails ? <ChevronUp className="w-3.5 h-3.5 ml-0.5" /> : <ChevronDown className="w-3.5 h-3.5 ml-0.5" />}
+          </button>
+
+          {showPromptDetails && (
+            <div className="mt-2.5 p-3 rounded-lg bg-neutral-950 border border-neutral-800 text-[10px] font-mono text-neutral-300 leading-relaxed max-h-56 overflow-y-auto whitespace-pre-wrap select-all">
+              {MASTER_EXTREME_REALISM_PROMPT}
+            </div>
+          )}
+        </div>
       </div>
 
       {/* 1. Upload Section */}
@@ -74,46 +96,6 @@ export const RenderForm: React.FC<RenderFormProps> = ({
         onImageCleared={onImageCleared}
         disabled={isRendering}
       />
-
-      {/* 2. Preset Selection */}
-      <LightingPresetSelector
-        selected={selectedPreset}
-        onSelect={onPresetSelect}
-        disabled={isRendering}
-      />
-
-      {/* 3. Additional Instructions */}
-      <div className="space-y-1.5">
-        <div className="flex items-baseline justify-between">
-          <label
-            htmlFor="instructions"
-            className="text-xs font-semibold uppercase tracking-wider text-neutral-700"
-          >
-            Keterangan Tambahan <span className="font-normal text-neutral-500">(Opsional)</span>
-          </label>
-          <span className="text-[11px] text-neutral-500">
-            {additionalInstructions.length}/500 karakter
-          </span>
-        </div>
-
-        <textarea
-          id="instructions"
-          rows={3}
-          maxLength={500}
-          disabled={isRendering}
-          value={additionalInstructions}
-          onChange={(e) => onInstructionsChange(e.target.value)}
-          placeholder="Tambahkan instruksi pencahayaan atau detail realisme... (contoh: 'Perkuat pantulan kaca jendela saat senja' atau 'Tambahkan aksen pantulan basah halus di paving')"
-          className="w-full px-3.5 py-2.5 text-xs text-neutral-900 bg-white border border-neutral-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-neutral-900 focus:border-transparent transition-all placeholder:text-neutral-400 disabled:bg-neutral-100 disabled:cursor-not-allowed"
-        />
-
-        <div className="flex items-start gap-1.5 text-[11px] text-neutral-500">
-          <ShieldCheck className="w-3.5 h-3.5 shrink-0 text-emerald-600 mt-0.5" />
-          <span>
-            Aturan pelestarian desain arsitektur selalu diutamakan. Instruksi tambahan hanya mempengaruhi nuansa pencahayaan dan respons fotorealistis tanpa mengubah struktur.
-          </span>
-        </div>
-      </div>
 
       {/* Error Feedback */}
       {errorMessage && (
@@ -131,28 +113,28 @@ export const RenderForm: React.FC<RenderFormProps> = ({
         <button
           type="submit"
           disabled={!canRender}
-          className={`w-full relative flex items-center justify-center gap-2.5 py-3.5 px-6 rounded-xl font-medium text-sm transition-all focus:outline-none focus-visible:ring-2 focus-visible:ring-neutral-900 ${
+          className={`w-full relative flex items-center justify-center gap-2.5 py-4 px-6 rounded-xl font-semibold text-sm transition-all focus:outline-none focus-visible:ring-2 focus-visible:ring-neutral-900 ${
             canRender
-              ? 'bg-neutral-950 text-white hover:bg-neutral-800 active:scale-[0.99] shadow-sm cursor-pointer'
+              ? 'bg-neutral-950 text-white hover:bg-neutral-800 active:scale-[0.99] shadow-md cursor-pointer'
               : 'bg-neutral-200 text-neutral-400 cursor-not-allowed'
           }`}
         >
           {isRendering ? (
             <>
               <Loader2 className="w-4 h-4 animate-spin text-neutral-400" />
-              <span>{renderingStage || 'Memproses Render Arsitektur...'}</span>
+              <span>{renderingStage || 'Memproses Fotorealisme Ekstrem...'}</span>
             </>
           ) : (
             <>
-              <Sparkles className="w-4 h-4 text-amber-400" />
-              <span>Render Image</span>
+              <Sparkles className="w-4 h-4 text-emerald-400" />
+              <span>Render Image (Extreme Photorealism)</span>
             </>
           )}
         </button>
 
         {!imagePreview && (
           <p className="text-center text-[11px] text-neutral-500 mt-2">
-            Unggah atau pilih sampel gambar arsitektur di atas untuk mengaktifkan tombol render.
+            Unggah gambar arsitektur Anda di atas untuk menjalankan peningkatan fotorealisme ekstrem.
           </p>
         )}
       </div>
